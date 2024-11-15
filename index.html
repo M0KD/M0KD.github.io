@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Item List with Editable Values, Save, and Load</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: space-between;
+            padding: 20px;
+        }
+        .input-container, .purchase-container, .save-load-container {
+            max-width: 300px;
+        }
+        .item-list {
+            margin-left: 50px;
+            max-width: 300px;
+        }
+        .item {
+            padding: 8px;
+            background-color: #f0f0f0;
+            margin-bottom: 5px;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .item img {
+            width: 50px;
+            height: 50px;
+            margin-right: 10px;
+            border-radius: 5px;
+        }
+        .profit {
+            padding: 8px;
+            background-color: #f0f0f0;
+            margin-top: 10px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="input-container">
+        <h2>Enter Item</h2>
+        <label for="itemName">Item Name:</label><br>
+        <input type="text" id="itemName" placeholder="Enter item name"><br><br>
+
+        <label for="itemPrice">Market Price (in galleons):</label><br>
+        <input type="number" id="itemPrice" placeholder="Enter market price"><br><br>
+
+        <label for="itemImage">Item Image:</label><br>
+        <input type="file" id="itemImage" accept="image/*"><br><br>
+
+        <button onclick="addItem()">Add Item</button>
+    </div>
+
+    <div class="purchase-container">
+        <h2>Purchase Calculator</h2>
+        <label for="purchaseItemName">Item to Purchase:</label><br>
+        <input type="text" id="purchaseItemName" placeholder="Enter item name"><br><br>
+
+        <label for="purchaseQuantity">Quantity:</label><br>
+        <input type="number" id="purchaseQuantity" placeholder="Enter quantity"><br><br>
+
+        <label for="purchasePercentage">Buying Price (% of Market):</label><br>
+        <input type="number" id="purchasePercentage" placeholder="Enter percentage"><br><br>
+
+        <button onclick="calculateProfit()">Calculate Profit</button>
+
+        <div id="profitDisplay" class="profit"></div>
+    </div>
+
+    <div class="item-list">
+        <h2>Items List</h2>
+        <div id="itemsContainer"></div>
+    </div>
+
+    <div class="save-load-container">
+        <h2>Save/Load Items</h2>
+        <button onclick="saveItems()">Save Items</button>
+        <button onclick="document.getElementById('fileInput').click()">Load Items</button>
+        <input type="file" id="fileInput" style="display: none" accept=".json" onchange="loadItems(event)">
+    </div>
+
+    <script>
+        const itemList = {};
+
+        function addItem() {
+            const itemName = document.getElementById("itemName").value;
+            const itemPrice = parseInt(document.getElementById("itemPrice").value);
+            const itemImage = document.getElementById("itemImage").files[0];
+
+            if (itemName && itemPrice && itemImage) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    // Store the item with a Base64 encoded image
+                    itemList[itemName.toLowerCase()] = {
+                        displayName: itemName,
+                        price: itemPrice,
+                        imageUrl: e.target.result // This is the Base64 image string
+                    };
+                    displayItem(itemName.toLowerCase(), itemName, itemPrice, e.target.result);
+                };
+                reader.readAsDataURL(itemImage);
+
+                // Clear input fields
+                document.getElementById("itemName").value = "";
+                document.getElementById("itemPrice").value = "";
+                document.getElementById("itemImage").value = "";
+            } else {
+                alert("Please enter an item name, price, and upload an image.");
+            }
+        }
+
+        function displayItem(id, name, price, imageUrl) {
+            const itemsContainer = document.getElementById("itemsContainer");
+
+            const itemDiv = document.createElement("div");
+            itemDiv.classList.add("item");
+            itemDiv.innerHTML = `
+                <img src="${imageUrl}" alt="${name}">
+                <div><strong>${name}</strong>: ${price} galleons</div>
+                <button onclick="editItem('${id}')">Edit</button>
+                <button onclick="deleteItem('${id}')">Delete</button>
+            `;
+            itemDiv.id = `item-${id}`;
+
+            itemsContainer.appendChild(itemDiv);
+        }
+
+        async function editItem(id) {
+            const item = itemList[id];
+            const newName = prompt("Edit Item Name:", item.displayName);
+            const newPrice = prompt("Edit Market Price (in galleons):", item.price);
+            const updateImage = confirm("Do you want to update the image?");
+            let newImageUrl = item.imageUrl;
+
+            if (updateImage) {
+                newImageUrl = await promptForImage();
+            }
+
+            if (newName && newPrice) {
+                itemList[id] = {
+                    displayName: newName,
+                    price: parseInt(newPrice),
+                    imageUrl: newImageUrl
+                };
+                updateDisplayedItem(id, newName, parseInt(newPrice), newImageUrl);
+            }
+        }
+
+        function promptForImage() {
+            return new Promise((resolve) => {
+                const input = document.createElement("input");
+                input.type = "file";
+                input.accept = "image/*";
+                input.onchange = (event) => {
+                    const file = event.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => resolve(e.target.result); // Base64 encoded image string
+                        reader.readAsDataURL(file);
+                    } else {
+                        resolve(null);
+                    }
+                };
+                input.click();
+            });
+        }
+
+        function updateDisplayedItem(id, name, price, imageUrl) {
+            const itemDiv = document.getElementById(`item-${id}`);
+            itemDiv.innerHTML = `
+                <img src="${imageUrl}" alt="${name}">
+                <div><strong>${name}</strong>: ${price} galleons</div>
+                <button onclick="editItem('${id}')">Edit</button>
+                <button onclick="deleteItem('${id}')">Delete</button>
+            `;
+        }
+
+        function deleteItem(id) {
+            // Remove item from itemList object
+            delete itemList[id];
+
+            // Remove item from the display
+            const itemDiv = document.getElementById(`item-${id}`);
+            if (itemDiv) {
+                itemDiv.remove();
+            }
+        }
+
+        function calculateProfit() {
+            const purchaseItemName = document.getElementById("purchaseItemName").value.toLowerCase();
+            const purchaseQuantity = parseInt(document.getElementById("purchaseQuantity").value);
+            const purchasePercentage = parseFloat(document.getElementById("purchasePercentage").value);
+
+            const profitDisplay = document.getElementById("profitDisplay");
+            profitDisplay.innerHTML = "";
+
+            if (itemList[purchaseItemName]) {
+                const marketPrice = itemList[purchaseItemName].price;
+                const salePrice = marketPrice - 1;
+                const buyingPrice = Math.floor(marketPrice * (purchasePercentage / 100));
+
+                const totalCost = buyingPrice * purchaseQuantity;
+                const totalRevenue = salePrice * purchaseQuantity;
+                const profit = totalRevenue - totalCost;
+
+                profitDisplay.innerHTML = `
+                    <strong>Profit Calculation:</strong><br>
+                    Market Price: ${marketPrice} galleons<br>
+                    Buying Price per Unit: ${buyingPrice} galleons<br>
+                    Selling Price per Unit: ${salePrice} galleons<br>
+                    Quantity: ${purchaseQuantity}<br>
+                    <strong>Total Profit: ${profit} galleons</strong>
+                `;
+            } else {
+                profitDisplay.innerHTML = `<strong>Unknown item: "${purchaseItemName}" not found in item list.</strong>`;
+            }
+        }
+
+        function saveItems() {
+            const dataStr = JSON.stringify(itemList);
+            const blob = new Blob([dataStr], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "items.json";
+            a.click();
+
+            URL.revokeObjectURL(url);
+        }
+
+        function loadItems(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = JSON.parse(e.target.result);
+                for (const id in data) {
+                    const itemData = data[id];
+                    itemList[id] = itemData;
+                    displayItem(id, itemData.displayName, itemData.price, itemData.imageUrl);
+                }
+            };
+            reader.readAsText(file);
+        }
+    </script>
+</body>
+</html>
